@@ -529,6 +529,9 @@ function handleTimeOut() {
     Array.from(optionsContainer.children).forEach(btn => btn.disabled = true);
 
     if (!isOnlineMode) {
+        // ✨ オフライン：時間切れ（不正解扱い）時にも問題文を全文表示
+        questionTextEl.textContent = currentQuestion.question;
+        
         resultMessageEl.textContent = `⏰ 時間切れ！ (正解: ${currentQuestion.answer})`;
         resultMessageEl.style.color = "#ff3b30";
         isLastAnswerCorrect = false;
@@ -622,6 +625,9 @@ async function checkAnswer(selectedOption) {
             console.error("解答送信エラー:", err);
         }
     } else {
+        // ✨ オフライン：解答判定が出た瞬間に問題文を全文表示（正解・不正解問わず）
+        questionTextEl.textContent = currentQuestion.question;
+
         if (isCorrect) {
             resultMessageEl.textContent = "⭕ 正解！";
             resultMessageEl.style.color = "#34c759";
@@ -1037,16 +1043,21 @@ function listenToRoom(roomId) {
 
         if (data.status === "playing" && data.lastAnswerResult) {
             const res = data.lastAnswerResult;
+            const currentQuestion = activeQuizData[currentQuestionIndex]; // ✨ 問題データを取得
             
             if (res.isCorrect) {
+                // ✨ オンライン：誰かが正解した瞬間に問題文を全文表示
+                questionTextEl.textContent = currentQuestion.question;
+                
                 resultMessageEl.textContent = `⭕ ${res.player} さんが正解！ (${res.answer})`;
                 resultMessageEl.style.color = "#34c759";
                 startNextCountdown(4);
                 if (isHost) scheduleAutoNextQuestion();
             } 
             else if (data.allWrongOrPassed) {
-                const currentQuestion = activeQuizData[currentQuestionIndex];
+                // ✨ オンライン：全員不正解になった瞬間に問題文を全文表示
                 questionTextEl.textContent = currentQuestion.question;
+                
                 resultMessageEl.textContent = `❌ 全員不正解... (正解: ${currentQuestion.answer})`;
                 resultMessageEl.style.color = "#ff3b30";
                 startNextCountdown(4);
