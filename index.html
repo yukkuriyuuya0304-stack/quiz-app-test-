@@ -2,183 +2,219 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>早押しクイズアプリ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>早押しクイズ</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* 簡単なレイアウト補助用のスタイル */
-        .hidden { display: none !important; }
-        .screen { max-width: 600px; margin: 0 auto; padding: 20px; position: relative; text-align: center; }
-        .nav-item { cursor: pointer; padding: 10px; margin: 5px; font-size: 16px; }
-        .kb-focused { outline: 3px solid #ff9500; border-radius: 4px; box-shadow: 0 0 8px rgba(255,149,0,0.8); }
-        .modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 1000; width: 90%; max-width: 400px; }
-        #timer-bar-container { width: 100%; height: 10px; background: #ddd; border-radius: 5px; margin: 10px 0; overflow: hidden; }
-        #timer-bar { height: 100%; background: #34c759; transition: width 0.05s linear; }
-        .timer-warning { background: #ff3b30 !important; }
-        #online-scoreboard { margin: 10px 0; font-weight: bold; background: #f0f8ff; padding: 10px; border-radius: 5px; }
-    </style>
 </head>
 <body>
+    <div class="container">
+        <!-- ヘッダー（操作方法ボタン） -->
+        <div class="top-bar">
+            <button id="show-help-btn" class="help-btn"></button>
+        </div>
 
-    <!-- 🏠 スタート画面 -->
-    <div id="start-screen" class="screen">
-        <!-- ✨ 修正箇所：操作説明ボタンを以前より少し右・少し下に配置 -->
-        <button id="show-help-btn" class="nav-item" style="position: absolute; right: 5px; top: 30px; font-size: 0.85em; padding: 5px 10px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px;">☆ 操作説明</button>
+        <!-- スタート画面 -->
+        <div id="start-screen">
+            <h1 class="app-title">早押しクイズ</h1>
+            
+            <div class="difficulty-container">
+                <label for="difficulty-select">難易度：</label>
+                <select id="difficulty-select">
+                    <option value="all">すべて</option>
+                    <option value="beginner">初級</option>
+                    <option value="advanced">上級</option>
+                </select>
+            </div>
 
-        <h1>クイズアプリ</h1>
+            <div id="main-menu-list" class="nav-menu">
+                <button class="mode-btn nav-item" id="mode-normal">通常モード<small>全ジャンルからランダム</small></button>
+                <button class="mode-btn mode-genre nav-item" id="btn-to-genre">ジャンルから遊ぶ<small>好きなカテゴリを選んで挑戦</small></button>
+                <!-- 作成者本人のみ表示されるパックボタン -->
+                <button class="mode-btn nav-item hidden" id="btn-to-pack" style="background-color: #5856d6;">作成したカテゴリから遊ぶ<small>追加した問題パックを選択</small></button>
+                <button class="mode-btn nav-item" id="mode-review" disabled>復習モード<small>間違えた問題はありません</small></button>
+                <button class="mode-btn mode-danger nav-item" id="mode-suddendeath">サドンデスモード<small>間違えたら即終了</small></button>
+                <button class="mode-btn nav-item" id="btn-to-create" style="background-color: #ff2d55;">＋ オリジナル問題を作る<small>みんなに問題を共有しよう</small></button>
+            </div>
+
+            <!-- ▼ オンライン対戦メニュー ▼ -->
+            <hr class="divider">
+            <h3 class="section-title">🌐 オンライン対戦</h3>
+
+            <div class="input-group">
+                <input type="text" id="player-name" placeholder="あなたのプレイヤー名">
+            </div>
+
+            <div id="online-menu-list" class="online-btn-group nav-menu">
+                <button class="mode-btn nav-item" id="btn-create-room" style="background-color: #ff9500; margin: 0;">ルームを作る</button>
+                <button class="mode-btn nav-item" id="btn-join-room" style="background-color: #34c759; margin: 0;">ルームに入る</button>
+            </div>
+
+            <div id="score-history-container">
+                <h3>過去の成績 (最新10件)</h3>
+                <ul id="score-history-list"><li>記録はありません</li></ul>
+            </div>
+        </div>
+
+        <!-- ▼ 待機室（ロビー）画面 ▼ -->
+        <div id="lobby-screen" class="hidden">
+            <h2>待機室（ロビー）</h2>
+            <p>合言葉: <strong id="room-key-display" style="font-size: 26px; color: #ff2d55; letter-spacing: 2px;">----</strong></p>
+
+            <div id="lobby-settings-container" class="settings-box">
+                <h3>⚙️ 対戦ルール設定</h3>
+                <div class="setting-item">
+                    <label>勝利条件:</label>
+                    <select id="lobby-win-condition" class="host-only-input">
+                        <option value="3">3問先取</option>
+                        <option value="5" selected>5問先取</option>
+                        <option value="10">10問先取</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>誤答ペナルティ:</label>
+                    <select id="lobby-penalty" class="host-only-input">
+                        <option value="none">減点なし</option>
+                        <option value="minus1">-1点減点</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>難易度:</label>
+                    <select id="lobby-difficulty" class="host-only-input">
+                        <option value="all">すべて</option>
+                        <option value="beginner">初級のみ</option>
+                        <option value="advanced">上級のみ</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>出題ジャンル:</label>
+                    <select id="lobby-genre" class="host-only-input">
+                        <option value="all">すべてのジャンル</option>
+                    </select>
+                </div>
+                <p id="guest-rule-notice" class="notice-text hidden">※ルールの変更はホストのみ可能です</p>
+            </div>
+            
+            <div class="players-box">
+                <h3>参加者一覧</h3>
+                <ul id="players-list"></ul>
+            </div>
+
+            <div class="nav-menu">
+                <button id="start-room-match-btn" class="mode-btn nav-item hidden" style="margin-top: 10px;">対戦スタート！</button>
+                <button class="back-btn nav-item" id="leave-room-btn">退出して戻る</button>
+            </div>
+        </div>
+
+        <!-- ジャンル選択画面 -->
+        <div id="genre-screen" class="hidden">
+            <h2>ジャンルを選択</h2>
+            <div id="genre-buttons-container" class="nav-menu"></div>
+            <button class="back-btn nav-item" id="back-to-start-btn" style="margin-top: 10px;">戻る</button>
+        </div>
+
+        <!-- パック（作成したカテゴリ）選択画面 -->
+        <div id="pack-screen" class="hidden">
+            <h2>作成したカテゴリを選択</h2>
+            <p style="font-size: 0.85em; color: #666; margin-bottom: 10px;">あなたが作成した問題パック一覧です</p>
+            <div id="pack-buttons-container" class="nav-menu"></div>
+            <button class="back-btn nav-item" id="back-from-pack-btn" style="margin-top: 10px;">戻る</button>
+        </div>
+
+        <!-- 問題作成画面 -->
+        <div id="create-screen" class="hidden">
+            <h2>問題を作成して公開</h2>
+            <div class="form-group">
+                <label>問題文</label>
+                <textarea id="create-q" rows="2" placeholder="問題を入力..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>正解の選択肢</label>
+                <input type="text" id="create-ans" placeholder="正解を入力">
+            </div>
+            <div class="form-group">
+                <label>ダミーの選択肢（3つ）</label>
+                <input type="text" id="create-d1" placeholder="ダミー1">
+                <input type="text" id="create-d2" placeholder="ダミー2">
+                <input type="text" id="create-d3" placeholder="ダミー3">
+            </div>
+            <div class="form-group">
+                <label>難易度</label>
+                <select id="create-diff">
+                    <option value="beginner">初級</option>
+                    <option value="advanced">上級</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>パック名（任意）</label>
+                <input type="text" id="create-pack" placeholder="例: マイ歴史クイズ （空欄可）">
+            </div>
+            <div class="form-group">
+                <label>ジャンルタグ</label>
+                <div id="tag-select-container"></div>
+            </div>
+
+            <div class="nav-menu">
+                <button id="submit-question-btn" class="mode-btn mode-genre nav-item" style="margin-top: 10px;">🚀 データベースに公開</button>
+                <button class="back-btn nav-item" id="cancel-create-btn">キャンセル</button>
+            </div>
+        </div>
+
+        <!-- クイズ画面 -->
+        <div id="quiz-screen" class="hidden">
+            <div class="quiz-header">
+                <button id="quit-btn">やめる</button>
+                <button id="show-rule-btn" class="hidden">📋 ルール確認</button>
+                <div id="timer-text" class="hidden">残り: 6.0秒</div>
+            </div>
+
+            <div id="online-scoreboard" class="scoreboard hidden"></div>
+            <div id="timer-bar-container" class="hidden"><div id="timer-bar"></div></div>
+            <div id="mode-label"></div>
+            <div id="question-number">問題 1</div>
+            <div id="question-text"></div>
+            
+            <button id="buzzer-btn" class="buzzer">早押し</button>
+            <div id="options-container" class="nav-menu hidden"></div>
+            <div id="result-message"></div>
+            
+            <div id="next-countdown-text" class="hidden"></div>
+            <button id="next-btn" class="hidden">次の問題へ</button>
+        </div>
         
-        <div>
-            <input type="text" id="player-name" class="nav-item" placeholder="プレイヤー名を入力" style="width: 80%; max-width: 250px;">
+        <!-- 結果画面 -->
+        <div id="result-screen" class="hidden">
+            <h2 id="result-title">終了！</h2>
+            <p id="final-score"></p>
+            <div class="nav-menu">
+                <button class="back-btn nav-item" id="back-home-btn" style="width: 100%;">ホームに戻る</button>
+            </div>
         </div>
-
-        <div style="margin: 15px 0;">
-            <label>難易度: </label>
-            <select id="difficulty-select" class="nav-item">
-                <option value="all">すべて</option>
-                <option value="beginner">初級</option>
-                <option value="advanced">上級</option>
-            </select>
-        </div>
-
-        <h3>シングルプレイ</h3>
-        <button id="mode-normal" class="nav-item mode-btn">通常モード</button>
-        <button id="mode-suddendeath" class="nav-item mode-btn">サドンデス</button>
-        <button id="btn-to-genre" class="nav-item mode-btn">ジャンル別</button>
-        <button id="btn-to-pack" class="nav-item mode-btn hidden">マイパック</button>
-        <button id="mode-review" class="nav-item mode-btn" disabled>復習モード <small></small></button>
-
-        <hr style="margin: 20px 0;">
-
-        <h3>オンライン対戦</h3>
-        <button id="btn-create-room" class="nav-item mode-btn" style="background-color: #ff2d55; color: white;">ルームを作成</button>
-        <button id="btn-join-room" class="nav-item mode-btn" style="background-color: #ff9500; color: white;">ルームに参加</button>
-
-        <hr style="margin: 20px 0;">
-        
-        <button id="btn-to-create" class="nav-item">✏️ オリジナル問題を作る</button>
-
-        <h3>最近の戦績</h3>
-        <ul id="score-history-list" style="text-align: left; font-size: 0.9em; color: #555;"></ul>
     </div>
 
-    <!-- 🗂️ ジャンル選択画面 -->
-    <div id="genre-screen" class="screen hidden">
-        <h2>ジャンルを選択</h2>
-        <div id="genre-buttons-container"></div>
-        <br>
-        <button id="back-to-start-btn" class="nav-item">戻る</button>
-    </div>
-
-    <!-- 📦 パック選択画面 -->
-    <div id="pack-screen" class="screen hidden">
-        <h2>マイパックを選択</h2>
-        <div id="pack-buttons-container"></div>
-        <br>
-        <button id="back-from-pack-btn" class="nav-item">戻る</button>
-    </div>
-
-    <!-- 📝 問題作成画面 -->
-    <div id="create-screen" class="screen hidden">
-        <h2>問題を作成</h2>
-        <input type="text" id="create-q" class="nav-item" placeholder="問題文" style="width: 90%;"><br>
-        <input type="text" id="create-ans" class="nav-item" placeholder="正解" style="width: 90%; border: 2px solid #34c759;"><br>
-        <input type="text" id="create-d1" class="nav-item" placeholder="ダミー選択肢1" style="width: 90%;"><br>
-        <input type="text" id="create-d2" class="nav-item" placeholder="ダミー選択肢2" style="width: 90%;"><br>
-        <input type="text" id="create-d3" class="nav-item" placeholder="ダミー選択肢3" style="width: 90%;"><br>
-        
-        <div style="margin: 10px 0;">
-            <select id="create-diff" class="nav-item">
-                <option value="beginner">初級</option>
-                <option value="advanced">上級</option>
-            </select>
-            <input type="text" id="create-pack" class="nav-item" placeholder="パック名(任意)">
-        </div>
-
-        <h4>ジャンルタグ (複数選択可)</h4>
-        <div id="tag-select-container" style="display: flex; flex-wrap: wrap; justify-content: center;"></div>
-
-        <br>
-        <button id="submit-question-btn" class="nav-item" style="background-color: #007aff; color: white;">公開する</button>
-        <button id="cancel-create-btn" class="nav-item">キャンセル</button>
-    </div>
-
-    <!-- 🌐 ロビー画面 (オンライン) -->
-    <div id="lobby-screen" class="screen hidden">
-        <h2>待機ロビー</h2>
-        <p>合言葉: <strong id="room-key-display" style="font-size: 1.5em; color: #ff2d55;"></strong></p>
-        
-        <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-            <p><strong>参加者:</strong></p>
-            <ul id="players-list" style="list-style: none; padding: 0;"></ul>
-        </div>
-
-        <div style="text-align: left; background: #eef; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
-            <h4>⚙️ ルーム設定</h4>
-            <label>勝利条件: <select id="lobby-win-condition" class="nav-item"><option value="3">3問先取</option><option value="5" selected>5問先取</option><option value="10">10問先取</option></select></label><br>
-            <label>難易度: <select id="lobby-difficulty" class="nav-item"><option value="all">すべて</option><option value="beginner">初級</option><option value="advanced">上級</option></select></label><br>
-            <label>ジャンル: <select id="lobby-genre" class="nav-item"></select></label><br>
-            <label>ペナルティ: <select id="lobby-penalty" class="nav-item"><option value="none">なし</option><option value="minus1">誤答で-1点</option></select></label>
-            <p id="guest-rule-notice" style="color: #666; font-size: 0.85em;">※設定変更とゲーム開始はホストのみ可能です</p>
-        </div>
-
-        <button id="start-room-match-btn" class="nav-item mode-btn" style="background-color: #34c759; color: white;">ゲーム開始！</button>
-        <button id="leave-room-btn" class="nav-item">退出する</button>
-    </div>
-
-    <!-- 🎮 クイズ画面 -->
-    <div id="quiz-screen" class="screen hidden">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span id="mode-label" style="font-size: 0.9em; color: #666;"></span>
-            <button id="show-rule-btn" class="nav-item hidden" style="font-size: 0.8em; padding: 2px 8px;">ルール確認</button>
-            <button id="quit-btn" class="nav-item" style="color: #ff3b30; font-size: 0.8em; padding: 2px 8px;">中断</button>
-        </div>
-
-        <div id="online-scoreboard" class="hidden"></div>
-        
-        <h3 id="question-number"></h3>
-        <div style="min-height: 80px; font-size: 1.2em; font-weight: bold; margin: 20px 0;">
-            <p id="question-text"></p>
-        </div>
-
-        <button id="buzzer-btn" class="nav-item" style="width: 150px; height: 150px; border-radius: 50%; background-color: #ff2d55; color: white; font-size: 1.5em; font-weight: bold; box-shadow: 0 8px #990000; cursor: pointer; margin: 10px auto; display: block;">早押し！</button>
-
-        <p id="timer-text" class="hidden" style="font-weight: bold; font-size: 1.1em;"></p>
-        <div id="timer-bar-container" class="hidden"><div id="timer-bar"></div></div>
-
-        <div id="options-container" class="hidden" style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;"></div>
-
-        <h3 id="result-message" style="margin-top: 20px; min-height: 30px;"></h3>
-        <p id="next-countdown-text" class="hidden" style="font-weight: bold; color: #007aff;"></p>
-        <button id="next-btn" class="nav-item hidden">次の問題へ</button>
-    </div>
-
-    <!-- 🏆 結果画面 -->
-    <div id="result-screen" class="screen hidden">
-        <h2 id="result-title">結果発表！</h2>
-        <div id="final-score" style="font-size: 1.5em; margin: 20px 0; font-weight: bold;"></div>
-        <button id="back-home-btn" class="nav-item mode-btn">トップへ戻る</button>
-    </div>
-
-    <!-- 📖 ルール確認モーダル (オンライン用) -->
+    <!-- ルール確認用モーダル -->
     <div id="rule-modal" class="modal hidden">
-        <h3>現在のルール設定</h3>
-        <div id="rule-modal-body" style="text-align: left; font-size: 1.1em;"></div>
-        <button id="close-rule-modal-btn" class="nav-item" style="margin-top: 15px;">閉じる</button>
+        <div class="modal-content">
+            <h3>📋 対戦ルール確認</h3>
+            <div id="rule-modal-body"></div>
+            <button id="close-rule-modal-btn" class="mode-btn">閉じる</button>
+        </div>
     </div>
 
-    <!-- ℹ️ 操作説明モーダル -->
+    <!-- ⌨️ 操作方法モーダル -->
     <div id="help-modal" class="modal hidden">
-        <h3>⌨️ キーボード操作説明</h3>
-        <ul style="text-align: left; line-height: 1.6;">
-            <li><strong>スペースキー / Enter:</strong> 早押しボタンを押す、決定</li>
-            <li><strong>上下矢印 / W, Sキー:</strong> メニューや選択肢の移動</li>
-            <li><strong>数字の 1 〜 4:</strong> 選択肢をダイレクトに選ぶ</li>
-            <li><strong>Qキー:</strong> 現在の問題をスキップ (オフライン専用)</li>
-        </ul>
-        <button id="close-help-modal-btn" class="nav-item" style="margin-top: 15px;">閉じる</button>
+        <div class="modal-content" style="text-align: left;">
+            <h3 style="text-align: center; margin-top: 0;">⌨️ キーボード操作方法</h3>
+            <ul class="help-list">
+                <li><kbd>W</kbd> / <kbd>↑</kbd> : カーソルを上に移動</li>
+                <li><kbd>S</kbd> / <kbd>↓</kbd> : カーソルを下に移動</li>
+                <li><kbd>Enter</kbd> / <kbd>Space</kbd> : 決定 / 早押しボタンを押す</li>
+                <li><kbd>1</kbd> 〜 <kbd>4</kbd> : 選択肢を直接選択 (解答時)</li>
+                <li><kbd>Q</kbd> : 次の問題へ強制スキップ (※オフライン限定)</li>
+            </ul>
+            <button id="close-help-modal-btn" class="mode-btn" style="margin-top: 15px;">閉じる</button>
+        </div>
     </div>
-
-    <!-- Firebaseモジュールの読み込み設定 -->
+    
     <script type="module" src="script.js"></script>
 </body>
 </html>

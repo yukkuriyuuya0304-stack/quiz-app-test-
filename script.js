@@ -1,7 +1,5 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, setDoc, getDoc, updateDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-//import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-//import { getFirestore, collection, addDoc, getDocs, doc, setDoc, getDoc, updateDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, doc, setDoc, getDoc, updateDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCLRWTz8HCrG4x41f4V-4S9_H8GKGOC-os",
@@ -16,7 +14,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 👤 端末固有のユーザーID管理
+// 👤 端末固有のユーザーID管理（作成者判定用）
 let myUserId = localStorage.getItem("quiz_creator_user_id");
 if (!myUserId) {
     myUserId = 'user_' + Math.random().toString(36).substr(2, 9) + Date.now();
@@ -460,7 +458,7 @@ function showOptions() {
     });
     optionsContainer.classList.remove("hidden");
     startTimer(MAX_TIME_MS, () => handleTimeOut()); 
-    updateKeyboardFocus(0); 
+    updateKeyboardFocus(0); // 1番目の選択肢にフォーカス
 }
 
 function startTimer(durationMs, onTimeOut) {
@@ -491,6 +489,7 @@ function startTimer(durationMs, onTimeOut) {
     }, 50);
 }
 
+// 早押しボタン押下時
 buzzerBtn.addEventListener("click", async () => {
     if (isBuzzed) return;
     isBuzzed = true;
@@ -527,9 +526,6 @@ function handleTimeOut() {
     Array.from(optionsContainer.children).forEach(btn => btn.disabled = true);
 
     if (!isOnlineMode) {
-        // ✨ オフライン：時間切れ時にも問題文を全文表示
-        questionTextEl.textContent = currentQuestion.question;
-
         resultMessageEl.textContent = `⏰ 時間切れ！ (正解: ${currentQuestion.answer})`;
         resultMessageEl.style.color = "#ff3b30";
         isLastAnswerCorrect = false;
@@ -623,9 +619,6 @@ async function checkAnswer(selectedOption) {
             console.error("解答送信エラー:", err);
         }
     } else {
-        // ✨ オフライン：解答判定が出た瞬間に問題文を全文表示（正解・不正解問わず）
-        questionTextEl.textContent = currentQuestion.question;
-
         if (isCorrect) {
             resultMessageEl.textContent = "⭕ 正解！";
             resultMessageEl.style.color = "#34c759";
@@ -669,8 +662,9 @@ function startNextCountdown(seconds, callback) {
     }, 1000);
 }
 
+// ⏩ オフライン専用：Qキーによる問題スキップ処理
 function skipQuestionOffline() {
-    if (isOnlineMode) return; 
+    if (isOnlineMode) return; // オンライン時は無効
     clearInterval(textInterval);
     clearInterval(answerTimer);
     clearInterval(nextCountdownInterval);
@@ -1040,21 +1034,16 @@ function listenToRoom(roomId) {
 
         if (data.status === "playing" && data.lastAnswerResult) {
             const res = data.lastAnswerResult;
-            const currentQuestion = activeQuizData[currentQuestionIndex];
-
+            
             if (res.isCorrect) {
-                // ✨ オンライン：誰かが正解した瞬間に問題文を全文表示
-                questionTextEl.textContent = currentQuestion.question;
-
                 resultMessageEl.textContent = `⭕ ${res.player} さんが正解！ (${res.answer})`;
                 resultMessageEl.style.color = "#34c759";
                 startNextCountdown(4);
                 if (isHost) scheduleAutoNextQuestion();
             } 
             else if (data.allWrongOrPassed) {
-                // ✨ オンライン：全員不正解になった瞬間に問題文を全文表示
+                const currentQuestion = activeQuizData[currentQuestionIndex];
                 questionTextEl.textContent = currentQuestion.question;
-
                 resultMessageEl.textContent = `❌ 全員不正解... (正解: ${currentQuestion.answer})`;
                 resultMessageEl.style.color = "#ff3b30";
                 startNextCountdown(4);
@@ -1138,6 +1127,7 @@ function updateKeyboardFocus(setIndex = null) {
 }
 
 document.addEventListener("keydown", (e) => {
+    // モーダル表示中はモーダルの操作を優先
     if (!helpModal.classList.contains("hidden") || !ruleModal.classList.contains("hidden")) {
         if (e.code === "Enter" || e.code === "Space" || e.code === "Escape") {
             helpModal.classList.add("hidden");
@@ -1146,17 +1136,20 @@ document.addEventListener("keydown", (e) => {
         return;
     }
 
+    // フォーム入力中はキー操作を無効化
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
 
     const key = e.code;
     const items = getVisibleNavItems();
 
+    // ⚡【判定順の修正】Q キー：オフライン限定即時問題スキップ（どの状態でも最優先で受付け）
     if (key === "KeyQ" && !quizScreen.classList.contains("hidden")) {
         e.preventDefault();
         skipQuestionOffline();
         return;
     }
 
+    // 1. 上下矢印 / W S キーによるフォーカス移動
     if (key === "ArrowUp" || key === "KeyW") {
         e.preventDefault();
         if (items.length > 0) {
@@ -1171,8 +1164,10 @@ document.addEventListener("keydown", (e) => {
         }
     }
 
+    // 2. Space / Enter キーによる決定・早押し
     else if (key === "Space" || key === "Enter") {
         e.preventDefault();
+        // クイズ画面で早押しボタンが有効な時は早押しを優先
         if (!quizScreen.classList.contains("hidden") && optionsContainer.classList.contains("hidden")) {
             if (!buzzerBtn.disabled) buzzerBtn.click();
         } else if (items.length > 0 && items[focusIndex]) {
@@ -1180,6 +1175,7 @@ document.addEventListener("keydown", (e) => {
         }
     }
 
+    // 3. 数字キー 1〜4 (選択肢ダイレクト選択)
     else if (!quizScreen.classList.contains("hidden") && !optionsContainer.classList.contains("hidden")) {
         const optionButtons = optionsContainer.querySelectorAll(".option-btn");
         let selectedIndex = -1;
