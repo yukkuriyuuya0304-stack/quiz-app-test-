@@ -43,7 +43,7 @@ async function loadCloudQuestions() {
         console.log("クラウドから問題を読み込みました！総問題数:", allQuizData.length);
         updateReviewButtonState();
         populateLobbyGenreOptions();
-        checkMyPacksExistence();
+        checkMyPacksExistence(); // 本人用パックボタンの表示制御
     } catch (error) {
         console.error("問題の読み込みエラー:", error);
     }
@@ -164,6 +164,7 @@ function renderHistory() {
 }
 window.addEventListener("DOMContentLoaded", loadData);
 
+// 本人が作成したパックが存在するか確認
 function checkMyPacksExistence() {
     const myPacks = [...new Set(allQuizData.filter(q => q.creatorId === myUserId && q.packName).map(q => q.packName))];
     if (myPacks.length > 0) {
@@ -174,6 +175,7 @@ function checkMyPacksExistence() {
     updateKeyboardFocus();
 }
 
+// モーダル制御
 document.getElementById("show-help-btn").addEventListener("click", () => helpModal.classList.remove("hidden"));
 document.getElementById("close-help-modal-btn").addEventListener("click", () => helpModal.classList.add("hidden"));
 
@@ -229,7 +231,7 @@ document.getElementById("submit-question-btn").addEventListener("click", async (
         difficulty: diff,
         genres: selectedTags,
         packName: pack,
-        creatorId: myUserId
+        creatorId: myUserId // 作成者IDを付与
     };
 
     try {
@@ -254,6 +256,7 @@ document.getElementById("submit-question-btn").addEventListener("click", async (
     }
 });
 
+// --- パック選択画面（本人のみ） ---
 btnToPack.addEventListener("click", () => {
     const myPacks = [...new Set(allQuizData.filter(q => q.creatorId === myUserId && q.packName).map(q => q.packName))];
     packButtonsContainer.innerHTML = "";
@@ -754,7 +757,7 @@ function showResult(isSuddenDeathGameOver, onlineScores = null) {
         saveHistory('online', difficultySelect.value, score, activeQuizData.length);
     } else {
         document.getElementById("result-title").textContent = isSuddenDeathGameOver ? "ゲームオーバー！" : "終了！";
-        document.getElementById("final-score").textContent = isSuddenDeathGameOver ? `記録: ${score}問連続正解でした！` : `${activeQuizData.length}問中、${score}问正解しました！`;
+        document.getElementById("final-score").textContent = isSuddenDeathGameOver ? `記録: ${score}問連続正解でした！` : `${activeQuizData.length}問中、${score}問正解しました！`;
         saveHistory(currentMode, difficultySelect.value, score, activeQuizData.length);
     }
     updateKeyboardFocus();
@@ -1103,10 +1106,12 @@ document.getElementById("leave-room-btn").addEventListener("click", () => {
 let focusIndex = 0;
 
 function getVisibleNavItems() {
+    // 現在表示されている画面の中にあるクリック可能な .nav-item を全取得
     const visibleScreens = [startScreen, genreScreen, packScreen, createScreen, quizScreen, resultScreen, lobbyScreen];
     const currentScreen = visibleScreens.find(s => !s.classList.contains("hidden"));
     if (!currentScreen) return [];
     
+    // クイズ画面かつ選択肢表示中なら選択肢のみをナビ対象にする
     if (currentScreen === quizScreen && !optionsContainer.classList.contains("hidden")) {
         return Array.from(optionsContainer.querySelectorAll(".nav-item:not(:disabled)"));
     }
@@ -1141,13 +1146,6 @@ document.addEventListener("keydown", (e) => {
 
     const key = e.code;
     const items = getVisibleNavItems();
-
-    // ⚡【判定順の修正】Q キー：オフライン限定即時問題スキップ（どの状態でも最優先で受付け）
-    if (key === "KeyQ" && !quizScreen.classList.contains("hidden")) {
-        e.preventDefault();
-        skipQuestionOffline();
-        return;
-    }
 
     // 1. 上下矢印 / W S キーによるフォーカス移動
     if (key === "ArrowUp" || key === "KeyW") {
@@ -1187,5 +1185,10 @@ document.addEventListener("keydown", (e) => {
         if (selectedIndex !== -1 && optionButtons[selectedIndex] && !optionButtons[selectedIndex].disabled) {
             optionButtons[selectedIndex].click();
         }
+    }
+
+    // 4. Q キー：オフライン限定即時問題スキップ
+    else if (key === "KeyQ" && !quizScreen.classList.contains("hidden")) {
+        skipQuestionOffline();
     }
 });
