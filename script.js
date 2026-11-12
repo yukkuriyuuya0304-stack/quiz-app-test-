@@ -120,6 +120,14 @@ const lobbyGenre = document.getElementById("lobby-genre");
 const lobbyPenalty = document.getElementById("lobby-penalty");
 const guestRuleNotice = document.getElementById("guest-rule-notice");
 
+// 🛠️ ルールボタンのレイアウト固定（中央配置・押し出し防止）
+showRuleBtn.style.position = "absolute";
+showRuleBtn.style.top = "10px";
+showRuleBtn.style.left = "50%";
+showRuleBtn.style.transform = "translateX(-50%)";
+showRuleBtn.style.zIndex = "100";
+showRuleBtn.style.margin = "0";
+
 // --- データ読込 ---
 async function loadData() {
     const savedWrong = localStorage.getItem("wrongQuestions");
@@ -231,7 +239,7 @@ document.getElementById("submit-question-btn").addEventListener("click", async (
         difficulty: diff,
         genres: selectedTags,
         packName: pack,
-        creatorId: myUserId // 作成者IDを付与
+        creatorId: myUserId 
     };
 
     try {
@@ -529,7 +537,8 @@ function handleTimeOut() {
     Array.from(optionsContainer.children).forEach(btn => btn.disabled = true);
 
     if (!isOnlineMode) {
-        // ✨ オフライン：時間切れ（不正解扱い）時にも問題文を全文表示
+        // ✨ オフライン時間切れ時：念のためタイマーを停止して全文表示
+        clearInterval(textInterval);
         questionTextEl.textContent = currentQuestion.question;
         
         resultMessageEl.textContent = `⏰ 時間切れ！ (正解: ${currentQuestion.answer})`;
@@ -584,6 +593,8 @@ function handleTimeOut() {
 
 async function checkAnswer(selectedOption) {
     clearInterval(answerTimer); 
+    clearInterval(textInterval); // 🛠️ 確実な文字送り停止（全文上書き防止）
+
     const currentQuestion = activeQuizData[currentQuestionIndex];
     Array.from(optionsContainer.children).forEach(btn => btn.disabled = true);
     
@@ -625,7 +636,7 @@ async function checkAnswer(selectedOption) {
             console.error("解答送信エラー:", err);
         }
     } else {
-        // ✨ オフライン：解答判定が出た瞬間に問題文を全文表示（正解・不正解問わず）
+        // ✨ オフライン：解答直後、タイマー停止状態で確実に全文表示
         questionTextEl.textContent = currentQuestion.question;
 
         if (isCorrect) {
@@ -1043,10 +1054,11 @@ function listenToRoom(roomId) {
 
         if (data.status === "playing" && data.lastAnswerResult) {
             const res = data.lastAnswerResult;
-            const currentQuestion = activeQuizData[currentQuestionIndex]; // ✨ 問題データを取得
+            const currentQuestion = activeQuizData[currentQuestionIndex]; 
             
             if (res.isCorrect) {
-                // ✨ オンライン：誰かが正解した瞬間に問題文を全文表示
+                // 🛠️ オンライン：誰かが正解した瞬間にタイマーを停止して全文表示
+                clearInterval(textInterval);
                 questionTextEl.textContent = currentQuestion.question;
                 
                 resultMessageEl.textContent = `⭕ ${res.player} さんが正解！ (${res.answer})`;
@@ -1055,7 +1067,8 @@ function listenToRoom(roomId) {
                 if (isHost) scheduleAutoNextQuestion();
             } 
             else if (data.allWrongOrPassed) {
-                // ✨ オンライン：全員不正解になった瞬間に問題文を全文表示
+                // 🛠️ オンライン：全員不正解になった瞬間にタイマーを停止して全文表示
+                clearInterval(textInterval);
                 questionTextEl.textContent = currentQuestion.question;
                 
                 resultMessageEl.textContent = `❌ 全員不正解... (正解: ${currentQuestion.answer})`;
@@ -1117,12 +1130,10 @@ document.getElementById("leave-room-btn").addEventListener("click", () => {
 let focusIndex = 0;
 
 function getVisibleNavItems() {
-    // 現在表示されている画面の中にあるクリック可能な .nav-item を全取得
     const visibleScreens = [startScreen, genreScreen, packScreen, createScreen, quizScreen, resultScreen, lobbyScreen];
     const currentScreen = visibleScreens.find(s => !s.classList.contains("hidden"));
     if (!currentScreen) return [];
     
-    // クイズ画面かつ選択肢表示中なら選択肢のみをナビ対象にする
     if (currentScreen === quizScreen && !optionsContainer.classList.contains("hidden")) {
         return Array.from(optionsContainer.querySelectorAll(".nav-item:not(:disabled)"));
     }
@@ -1143,7 +1154,6 @@ function updateKeyboardFocus(setIndex = null) {
 }
 
 document.addEventListener("keydown", (e) => {
-    // モーダル表示中はモーダルの操作を優先
     if (!helpModal.classList.contains("hidden") || !ruleModal.classList.contains("hidden")) {
         if (e.code === "Enter" || e.code === "Space" || e.code === "Escape") {
             helpModal.classList.add("hidden");
@@ -1152,10 +1162,17 @@ document.addEventListener("keydown", (e) => {
         return;
     }
 
-    // フォーム入力中はキー操作を無効化
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
 
     const key = e.code;
+    
+    // 🛠️ 0. Q キー：オフライン限定即時問題スキップ（どの状況でも最優先で発動するように移動）
+    if (key === "KeyQ" && !quizScreen.classList.contains("hidden")) {
+        e.preventDefault();
+        skipQuestionOffline();
+        return; 
+    }
+
     const items = getVisibleNavItems();
 
     // 1. 上下矢印 / W S キーによるフォーカス移動
@@ -1172,18 +1189,15 @@ document.addEventListener("keydown", (e) => {
             updateKeyboardFocus();
         }
     }
-
     // 2. Space / Enter キーによる決定・早押し
     else if (key === "Space" || key === "Enter") {
         e.preventDefault();
-        // クイズ画面で早押しボタンが有効な時は早押しを優先
         if (!quizScreen.classList.contains("hidden") && optionsContainer.classList.contains("hidden")) {
             if (!buzzerBtn.disabled) buzzerBtn.click();
         } else if (items.length > 0 && items[focusIndex]) {
             items[focusIndex].click();
         }
     }
-
     // 3. 数字キー 1〜4 (選択肢ダイレクト選択)
     else if (!quizScreen.classList.contains("hidden") && !optionsContainer.classList.contains("hidden")) {
         const optionButtons = optionsContainer.querySelectorAll(".option-btn");
@@ -1196,10 +1210,5 @@ document.addEventListener("keydown", (e) => {
         if (selectedIndex !== -1 && optionButtons[selectedIndex] && !optionButtons[selectedIndex].disabled) {
             optionButtons[selectedIndex].click();
         }
-    }
-
-    // 4. Q キー：オフライン限定即時問題スキップ
-    else if (key === "KeyQ" && !quizScreen.classList.contains("hidden")) {
-        skipQuestionOffline();
     }
 });
